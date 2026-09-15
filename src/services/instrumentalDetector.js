@@ -86,7 +86,35 @@ const PURE_INSTRUMENTAL_ARTISTS = [
   'potsu',
   'ludwig göransson',
   'jesper kyd',
-  'daniel pemberton'
+  'daniel pemberton',
+  'flawed mangoes',
+  'txmy',
+  'silo',
+  'daniel.mp3',
+  'øneheart',
+  'reidenshi',
+  'gibran alcocer',
+  'emile mosseri',
+  'susumu hirasawa',
+  'jeremy soule',
+  'frankjavcee',
+  'scizzie',
+  'synthwave goose',
+  'hildur guðnadóttir',
+  'clint mansell',
+  'ólafur arnalds',
+  'johann johannsson',
+  'caleb arredondo',
+  'derrol',
+  'l.dre',
+  'closed on sunday',
+  'the deli',
+  'slofi',
+  'chill bard',
+  'medieval cat',
+  'lofi cody',
+  'sweetboikyle',
+  'gamechops'
 ];
 
 const lyricsCache = new Map();
@@ -187,6 +215,25 @@ export async function analyzeTrackInstrumental(track, audioFeatures = null, opti
       isInstrumental: false,
       statusLabel: 'Vocal Track',
       reasons: ['Contains featured vocalist / vocal marker']
+    };
+  }
+
+  // Immediate disqualification: Explicit content (rap/metal tracks) unless explicitly titled instrumental
+  if (track.explicit && !name.includes('instrumental')) {
+    return {
+      id: track.id,
+      uri: track.uri,
+      name: track.name,
+      artists: (track.artists || []).map(a => a.name).join(', '),
+      album: track.album?.name,
+      albumArt: track.album?.images?.[0]?.url || '',
+      duration_ms: track.duration_ms,
+      preview_url: track.preview_url,
+      external_url: track.external_urls?.spotify,
+      confidenceScore: 0,
+      isInstrumental: false,
+      statusLabel: 'Vocal Track',
+      reasons: ['Explicit content tag (Vocal rap/rock indicator)']
     };
   }
 

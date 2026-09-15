@@ -201,12 +201,24 @@ export class SpotifyService {
 
   async createPlaylist(accessToken, userId, name, description = 'Curated Instrumental Collection') {
     const client = this.createClient(accessToken);
-    const res = await client.post(`/users/${userId}/playlists`, {
-      name: name,
-      description: description,
-      public: false
-    });
-    return res.data;
+    try {
+      const res = await client.post('/me/playlists', {
+        name: name,
+        description: description,
+        public: false
+      });
+      return res.data;
+    } catch (err) {
+      if (userId) {
+        const fallbackRes = await client.post(`/users/${userId}/playlists`, {
+          name: name,
+          description: description,
+          public: false
+        });
+        return fallbackRes.data;
+      }
+      throw err;
+    }
   }
 
   async getTargetPlaylistTrackUris(accessToken, playlistId) {

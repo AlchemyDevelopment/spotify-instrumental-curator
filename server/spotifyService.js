@@ -108,138 +108,85 @@ export class SpotifyService {
   async getPlaylistTracks(accessToken, playlistId) {
     const client = this.createClient(accessToken);
     let tracks = [];
-    let url = `/playlists/${playlistId}/tracks?limit=100`;
-
-    while (url) {
-      const res = await client.get(url);
-      if (res.data.items) {
-        for (const item of res.data.items) {
-          if (item && item.track && item.track.id && !item.track.is_local) {
-            tracks.push(item.track);
-          }
-        }
-      }
-      url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
-      if (tracks.length >= 1000) break;
-    }
-
-    return tracks;
-  }
-
-  async getRecentlyPlayedTracks(accessToken, limit = 50) {
-    const client = this.createClient(accessToken);
-    try {
-      const res = await client.get(`/me/player/recently-played?limit=${limit}`);
-      const tracks = [];
-      const seen = new Set();
-      if (res.data.items) {
-        for (const item of res.data.items) {
-          if (item && item.track && item.track.id && !seen.has(item.track.id)) {
-            seen.add(item.track.id);
-            tracks.push({
-              ...item.track,
-              played_at: item.played_at
-            });
-          }
-        }
-      }
-      return tracks;
-    } catch (err) {
-      console.error('Error fetching recently played tracks:', err.response?.data || err.message);
-      return [];
-    }
-  }
-
-  async getTopTracks(accessToken, timeRange = 'short_term', limit = 50) {
-    const client = this.createClient(accessToken);
-    try {
-      const res = await client.get(`/me/top/tracks?time_range=${timeRange}&limit=${limit}`);
-      return (res.data.items || []).filter(t => t && t.id && !t.is_local);
-    } catch (err) {
-      console.error('Error fetching top tracks:', err.response?.data || err.message);
-      return [];
-    }
-  }
-
-  async getSavedTracks(accessToken, limit = 50) {
-    const client = this.createClient(accessToken);
-    try {
-      const res = await client.get(`/me/tracks?limit=${limit}`);
-      return (res.data.items || []).map(i => i.track).filter(t => t && t.id && !t.is_local);
-    } catch (err) {
-      console.error('Error fetching saved tracks:', err.response?.data || err.message);
-      return [];
-    }
-  }
-
-  async getAudioFeaturesBatch(accessToken, trackIds) {
-    if (!trackIds || trackIds.length === 0) return {};
-    const client = this.createClient(accessToken);
-    const resultMap = {};
-
-    // Spotify allows up to 100 track IDs per audio-features call
-    for (let i = 0; i < trackIds.length; i += 100) {
-      const batch = trackIds.slice(i, i + 100);
-      try {
-        const res = await client.get(`/audio-features?ids=${batch.join(',')}`);
-        if (res.data && res.data.audio_features) {
-          for (const feat of res.data.audio_features) {
-            if (feat && feat.id) {
-              resultMap[feat.id] = feat;
-            }
-          }
-        }
-      } catch (err) {
-        // Audio features might be restricted by Spotify API for recent developer apps
-        console.warn('Spotify Audio Features API response:', err.response?.status, err.response?.statusText || err.message);
-        break;
-      }
-    }
-
-    return resultMap;
-  }
-
-  async createPlaylist(accessToken, userId, name, description = 'Curated Instrumental Collection') {
-    const client = this.createClient(accessToken);
-    try {
-      const res = await client.post('/me/playlists', {
-        name: name,
-        description: description,
-        public: false
-      });
-      return res.data;
-    } catch (err) {
-      if (userId) {
-        const fallbackRes = await client.post(`/users/${userId}/playlists`, {
-          name: name,
-          description: description,
-          public: false
-        });
-        return fallbackRes.data;
-      }
-      throw err;
-    }
-  }
-
-  async getTargetPlaylistTrackUris(accessToken, playlistId) {
-    const client = this.createClient(accessToken);
-    const uris = new Set();
-    let url = `/playlists/${playlistId}/tracks?limit=100&fields=items(track(uri)),next`;
+    let url = `/playlists/${playlistId}/items?limit=100`;
 
     try {
       while (url) {
         const res = await client.get(url);
         if (res.data.items) {
           for (const item of res.data.items) {
-            if (item && item.track && item.track.uri) {
-              uris.add(item.track.uri);
+            const track = item?.item || item?.track;
+            if (track && track.id && !track.is_local) {
+              tracks.push(track);
+            }
+          }
+        }
+        url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
+        if (tracks.length >= 1000) break;
+      }
+      return tracks;
+    } catch (err) {
+      // Fallback to /tracks for older API versions
+      try {
+        let fallbackUrl = `/playlists/${playlistId}/tracks?limit=100`;
+        while (fallbackUrl) {
+          const res = await client.get(fallbackUrl);
+          if (res.data.items) {
+            for (const item of res.data.items) {
+              const track = item?.item || item?.track;
+              if (track && track.id && !track.is_local) {
+                tracks.push(track);
+              }
+            }
+          }
+          fallbackUrl = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
+          if (tracks.length >= 1000) break;
+        }
+        return tracks;
+      } catch (fallbackErr) {
+        console.error(`Error reading playlist ${playlistId}:`, err.message);
+        return [];
+      }
+    }
+  }
+
+  async getTargetPlaylistTrackUris(accessToken, playlistId) {
+    const client = this.createClient(accessToken);
+    const uris = new Set();
+    let url = `/playlists/${playlistId}/items?limit=100`;
+
+    try {
+      while (url) {
+        const res = await client.get(url);
+        if (res.data.items) {
+          for (const item of res.data.items) {
+            const track = item?.item || item?.track;
+            if (track && track.uri) {
+              uris.add(track.uri);
             }
           }
         }
         url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
       }
     } catch (err) {
-      console.error('Error getting target playlist track uris:', err.response?.data || err.message);
+      // Fallback
+      try {
+        let fallbackUrl = `/playlists/${playlistId}/tracks?limit=100`;
+        while (fallbackUrl) {
+          const res = await client.get(fallbackUrl);
+          if (res.data.items) {
+            for (const item of res.data.items) {
+              const track = item?.item || item?.track;
+              if (track && track.uri) {
+                uris.add(track.uri);
+              }
+            }
+          }
+          fallbackUrl = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
+        }
+      } catch (fallbackErr) {
+        console.error('Error getting target playlist track uris:', err.response?.data || err.message);
+      }
     }
 
     return uris;
@@ -250,12 +197,18 @@ export class SpotifyService {
     const client = this.createClient(accessToken);
     let addedCount = 0;
 
-    // Spotify adds in batches of 100
     for (let i = 0; i < trackUris.length; i += 100) {
       const batch = trackUris.slice(i, i + 100);
-      await client.post(`/playlists/${playlistId}/tracks`, {
-        uris: batch
-      });
+      try {
+        await client.post(`/playlists/${playlistId}/items`, {
+          uris: batch
+        });
+      } catch (err) {
+        // Fallback to /tracks
+        await client.post(`/playlists/${playlistId}/tracks`, {
+          uris: batch
+        });
+      }
       addedCount += batch.length;
     }
 

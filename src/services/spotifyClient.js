@@ -136,15 +136,16 @@ export class SpotifyClient {
   async getPlaylistTracks(token, playlistId) {
     const client = this.createApiClient(token);
     let tracks = [];
-    let url = `/playlists/${playlistId}/tracks?limit=100`;
+    let url = `/playlists/${playlistId}/items?limit=100`;
 
     try {
       while (url) {
         const res = await client.get(url);
         if (res.data.items) {
           for (const item of res.data.items) {
-            if (item && item.track && item.track.id && !item.track.is_local) {
-              tracks.push(item.track);
+            const track = item?.item || item?.track;
+            if (track && track.id && !track.is_local) {
+              tracks.push(track);
             }
           }
         }
@@ -153,13 +154,15 @@ export class SpotifyClient {
       }
       return tracks;
     } catch (err) {
-      // Fallback: Try fetching playlist directly
+      // Fallback: Try fetching playlist directly or via /tracks
       try {
         const fallbackRes = await client.get(`/playlists/${playlistId}`);
-        if (fallbackRes.data?.tracks?.items) {
-          for (const item of fallbackRes.data.tracks.items) {
-            if (item && item.track && item.track.id && !item.track.is_local) {
-              tracks.push(item.track);
+        const items = fallbackRes.data?.items?.items || fallbackRes.data?.tracks?.items;
+        if (items) {
+          for (const item of items) {
+            const track = item?.item || item?.track;
+            if (track && track.id && !track.is_local) {
+              tracks.push(track);
             }
           }
         }
@@ -179,9 +182,10 @@ export class SpotifyClient {
       const seen = new Set();
       if (res.data.items) {
         for (const item of res.data.items) {
-          if (item && item.track && item.track.id && !seen.has(item.track.id)) {
-            seen.add(item.track.id);
-            tracks.push(item.track);
+          const track = item?.item || item?.track;
+          if (track && track.id && !seen.has(track.id)) {
+            seen.add(track.id);
+            tracks.push(track);
           }
         }
       }
@@ -196,7 +200,7 @@ export class SpotifyClient {
     const client = this.createApiClient(token);
     try {
       const res = await client.get(`/me/top/tracks?time_range=short_term&limit=${limit}`);
-      return (res.data.items || []).filter(t => t && t.id && !t.is_local);
+      return (res.data.items || []).map(i => i?.item || i?.track || i).filter(t => t && t.id && !t.is_local);
     } catch (err) {
       console.warn('Top tracks not available:', err.message);
       return [];
@@ -207,7 +211,7 @@ export class SpotifyClient {
     const client = this.createApiClient(token);
     try {
       const res = await client.get(`/me/tracks?limit=${limit}`);
-      return (res.data.items || []).map(i => i.track).filter(t => t && t.id && !t.is_local);
+      return (res.data.items || []).map(i => i?.item || i?.track || i).filter(t => t && t.id && !t.is_local);
     } catch (err) {
       console.warn('Saved tracks not available:', err.message);
       return [];
@@ -242,22 +246,40 @@ export class SpotifyClient {
   async getTargetPlaylistTrackUris(token, playlistId) {
     const client = this.createApiClient(token);
     const uris = new Set();
-    let url = `/playlists/${playlistId}/tracks?limit=100&fields=items(track(uri)),next`;
+    let url = `/playlists/${playlistId}/items?limit=100`;
 
     try {
       while (url) {
         const res = await client.get(url);
         if (res.data.items) {
           for (const item of res.data.items) {
-            if (item && item.track && item.track.uri) {
-              uris.add(item.track.uri);
+            const track = item?.item || item?.track;
+            if (track && track.uri) {
+              uris.add(track.uri);
             }
           }
         }
         url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
       }
     } catch (err) {
-      console.warn('Error reading target playlist tracks:', err.message);
+      // Fallback to /tracks
+      try {
+        let fallbackUrl = `/playlists/${playlistId}/tracks?limit=100`;
+        while (fallbackUrl) {
+          const res = await client.get(fallbackUrl);
+          if (res.data.items) {
+            for (const item of res.data.items) {
+              const track = item?.item || item?.track;
+              if (track && track.uri) {
+                uris.add(track.uri);
+              }
+            }
+          }
+          fallbackUrl = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
+        }
+      } catch (fallbackErr) {
+        console.warn('Error reading target playlist tracks:', err.message);
+      }
     }
 
     return uris;
@@ -292,9 +314,16 @@ export class SpotifyClient {
 
     for (let i = 0; i < trackUris.length; i += 100) {
       const batch = trackUris.slice(i, i + 100);
-      await client.post(`/playlists/${playlistId}/tracks`, {
-        uris: batch
-      });
+      try {
+        await client.post(`/playlists/${playlistId}/items`, {
+          uris: batch
+        });
+      } catch (err) {
+        // Fallback to /tracks
+        await client.post(`/playlists/${playlistId}/tracks`, {
+          uris: batch
+        });
+      }
       addedCount += batch.length;
     }
 

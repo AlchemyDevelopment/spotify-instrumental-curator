@@ -13,6 +13,8 @@ export function SourceSelector({
   setIncludeTopTracks,
   includeLikedSongs,
   setIncludeLikedSongs,
+  trustSourcePlaylist,
+  setTrustSourcePlaylist,
   loading
 }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +35,34 @@ export function SourceSelector({
             <p style={{ fontSize: '12px' }}>Choose which playlists or listening activity to analyze for instrumentals</p>
           </div>
         </div>
+
+        {selectedPlaylistIds.length > 0 && (
+          <div
+            onClick={() => setTrustSourcePlaylist(!trustSourcePlaylist)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-full)',
+              background: trustSourcePlaylist ? 'rgba(29, 185, 84, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              border: `1px solid ${trustSourcePlaylist ? 'var(--spotify-green)' : 'var(--border-subtle)'}`,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            title="When active, all tracks in your selected source playlists are treated as verified instrumentals"
+          >
+            <input
+              type="checkbox"
+              checked={trustSourcePlaylist}
+              onChange={() => {}}
+              style={{ accentColor: 'var(--spotify-green)', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '12px', fontWeight: '600', color: trustSourcePlaylist ? '#1ed760' : 'var(--text-secondary)' }}>
+              Source playlist is 100% instrumental (Trust mode)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Listening Activity Sources */}

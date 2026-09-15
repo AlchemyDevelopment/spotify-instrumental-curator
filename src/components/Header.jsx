@@ -72,9 +72,17 @@ export function Header({ user, onLogin, onLogout, onOpenSettings, onOpenGuide, h
             </div>
             <button
               className="btn btn-ghost"
+              onClick={onLogin}
+              title="Refresh / Grant Permissions"
+              style={{ fontSize: '11px', padding: '4px 8px', color: 'var(--spotify-green)', background: 'rgba(29, 185, 84, 0.1)' }}
+            >
+              Re-authorize
+            </button>
+            <button
+              className="btn btn-ghost"
               onClick={onLogout}
               title="Disconnect Spotify"
-              style={{ padding: '4px', marginLeft: '4px' }}
+              style={{ padding: '4px', marginLeft: '2px' }}
             >
               <LogOut size={16} color="var(--text-muted)" />
             </button>

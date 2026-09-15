@@ -54,7 +54,8 @@ export class SpotifyClient {
       scope: scopes,
       code_challenge_method: 'S256',
       code_challenge: codeChallenge,
-      redirect_uri: this.redirectUri
+      redirect_uri: this.redirectUri,
+      show_dialog: 'true'
     });
 
     window.location.href = `${SPOTIFY_ACCOUNTS_URL}/authorize?${params.toString()}`;
@@ -137,20 +138,37 @@ export class SpotifyClient {
     let tracks = [];
     let url = `/playlists/${playlistId}/tracks?limit=100`;
 
-    while (url) {
-      const res = await client.get(url);
-      if (res.data.items) {
-        for (const item of res.data.items) {
-          if (item && item.track && item.track.id && !item.track.is_local) {
-            tracks.push(item.track);
+    try {
+      while (url) {
+        const res = await client.get(url);
+        if (res.data.items) {
+          for (const item of res.data.items) {
+            if (item && item.track && item.track.id && !item.track.is_local) {
+              tracks.push(item.track);
+            }
           }
         }
+        url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
+        if (tracks.length >= 1000) break;
       }
-      url = res.data.next ? res.data.next.replace(SPOTIFY_API_BASE, '') : null;
-      if (tracks.length >= 1000) break;
+      return tracks;
+    } catch (err) {
+      // Fallback: Try fetching playlist directly
+      try {
+        const fallbackRes = await client.get(`/playlists/${playlistId}`);
+        if (fallbackRes.data?.tracks?.items) {
+          for (const item of fallbackRes.data.tracks.items) {
+            if (item && item.track && item.track.id && !item.track.is_local) {
+              tracks.push(item.track);
+            }
+          }
+        }
+        return tracks;
+      } catch (fallbackErr) {
+        console.warn(`Could not load playlist ${playlistId}:`, err.response?.data?.error?.message || err.message);
+        return [];
+      }
     }
-
-    return tracks;
   }
 
   async getRecentlyPlayedTracks(token, limit = 50) {

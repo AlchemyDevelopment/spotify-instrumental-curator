@@ -303,7 +303,8 @@ export default function App() {
 
         const analysis = await analyzeTrackInstrumental(track, audioFeat, {
           threshold: instrumentalThreshold,
-          checkLyrics
+          checkLyrics,
+          source: item.source
         });
 
         const isAlreadyInTarget = existingTargetUris.has(track.uri);

@@ -199,6 +199,28 @@ export async function analyzeTrackInstrumental(track, audioFeatures = null, opti
   const album = (track.album?.name || '').toLowerCase();
   const artists = (track.artists || []).map(a => (a.name || '').toLowerCase()).join(', ');
 
+  // Designated 100% instrumental playlists: Pokémon Jazz, Developer Focus, Coding - Epic Instrumentals, The Fall of 26
+  const sourceName = (options.source || options.sourcePlaylist || (options.playlists || []).join(' ')).toLowerCase();
+  const isDesignatedInstrumental = /pok[eé]mon\s*jazz|developer\s*focus|coding\s*-\s*epic\s*instrumentals|the\s*fall\s*of\s*26/i.test(sourceName);
+
+  if (isDesignatedInstrumental) {
+    return {
+      id: track.id,
+      uri: track.uri,
+      name: track.name,
+      artists: (track.artists || []).map(a => a.name).join(', '),
+      album: track.album?.name,
+      albumArt: track.album?.images?.[0]?.url || '',
+      duration_ms: track.duration_ms,
+      preview_url: track.preview_url,
+      external_url: track.external_urls?.spotify,
+      confidenceScore: 100,
+      isInstrumental: true,
+      statusLabel: 'Verified Instrumental',
+      reasons: [`From designated instrumental playlist: "${options.source || 'Trusted Source'}"`]
+    };
+  }
+
   // Immediate disqualification: vocal features
   if (/\(feat\.|\bft\.|\bvocals?\b|\bacapella\b/i.test(name)) {
     return {

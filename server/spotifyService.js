@@ -150,6 +150,39 @@ export class SpotifyService {
     }
   }
 
+  async getRecentlyPlayedTracks(accessToken, limit = 50) {
+    const client = this.createClient(accessToken);
+    try {
+      const res = await client.get(`/me/player/recently-played?limit=${limit}`);
+      const tracks = [];
+      const seen = new Set();
+      if (res.data.items) {
+        for (const item of res.data.items) {
+          const t = item?.track || item?.item;
+          if (t && t.id && !seen.has(t.id)) {
+            seen.add(t.id);
+            tracks.push(t);
+          }
+        }
+      }
+      return tracks;
+    } catch (err) {
+      console.warn('Recently played tracks not available:', err.message);
+      return [];
+    }
+  }
+
+  async getTopTracks(accessToken, timeRange = 'short_term', limit = 50) {
+    const client = this.createClient(accessToken);
+    try {
+      const res = await client.get(`/me/top/tracks?time_range=${timeRange}&limit=${limit}`);
+      return (res.data.items || []).map(i => i?.track || i?.item || i).filter(t => t && t.id && !t.is_local);
+    } catch (err) {
+      console.warn('Top tracks not available:', err.message);
+      return [];
+    }
+  }
+
   async getTargetPlaylistTrackUris(accessToken, playlistId) {
     const client = this.createClient(accessToken);
     const uris = new Set();

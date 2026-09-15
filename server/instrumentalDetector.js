@@ -1,87 +1,46 @@
 import axios from 'axios';
 
-const INSTRUMENTAL_TITLE_KEYWORDS = [
+const STRICT_TITLE_KEYWORDS = [
   'instrumental',
-  'instrumental version',
-  'instrumental mix',
-  'karaoke',
-  'backing track',
-  'without vocals',
-  'no vocals',
   'piano version',
   'piano cover',
   'piano arrangement',
+  'piano solo',
   'acoustic guitar version',
+  'acoustic guitar cover',
+  'guitar cover',
+  'guitar version',
   'orchestral version',
   'orchestral cover',
   'orchestral mix',
   'symphonic version',
-  'lofi beat',
-  'lo-fi beat',
-  'ambient version',
-  'synthwave instrumental',
-  'chillhop',
-  'score',
-  'original score',
-  'soundtrack version',
-  'bgm',
-  'soundtrack score',
-  'theme - instrumental',
   'saxophone version',
   'trumpet version',
-  'guitar version',
   'flute version',
   'violin version',
   'cello version',
   'harp version',
-  'reprise',
-  'slowed',
-  'sped up',
-  'dark fantasy',
-  'overture',
-  'concerto',
-  'sonata',
-  'nocturne',
-  'prelude',
-  'waltz',
-  'etude',
-  'symphony',
-  'intermezzo',
-  'rhapsody',
-  'lofi',
-  'lo-fi',
-  'guitar'
+  'original score',
+  'score from',
+  'theme - instrumental',
+  'karaoke version',
+  'backing track',
+  'without vocals',
+  'no vocals'
 ];
 
-const SOUNDTRACK_OR_OST_KEYWORDS = [
-  'soundtrack',
+const STRICT_SCORE_OR_SOUNDTRACK = [
   'original soundtrack',
-  'ost',
   'original game soundtrack',
   'game & jazz',
-  'video game',
-  'game theme',
-  'music from',
-  'motion picture soundtrack',
-  'score from',
-  'anime soundtrack',
+  'video game variations',
+  'skyrim sessions',
   'film score',
-  'sessions',
-  'ambient',
-  'chill beats',
-  'relaxing piano',
-  'smooth sax',
-  'soft rock sax',
-  'saxophone chill',
-  'piano works',
-  'instrumental works',
-  'lofi remix',
-  'guitar cover',
-  'sax cover',
-  'piano cover'
+  'soundtrack score',
+  'original score'
 ];
 
-const INSTRUMENTAL_ARTIST_CUES = [
+const PURE_INSTRUMENTAL_ARTISTS = [
   'hans zimmer',
   'ludovico einaudi',
   'john williams',
@@ -119,11 +78,12 @@ const INSTRUMENTAL_ARTIST_CUES = [
   'laurence manning',
   'samuel solís',
   'chilled teddy',
-  'dominant',
-  'daniel.mp3',
-  'cormill',
-  'nato kitch',
-  'piero umiliani'
+  'insaneintherainmusic',
+  'braxton burks',
+  'potsu',
+  'ludwig göransson',
+  'jesper kyd',
+  'daniel pemberton'
 ];
 
 const lyricsCache = new Map();
@@ -154,7 +114,7 @@ export async function checkLrclib(trackName, artistName, albumName, durationMs) 
     if (response.data) {
       const isInst = response.data.instrumental === true ||
         (!response.data.plainLyrics && !response.data.syncedLyrics);
-      const hasActualLyrics = !!(response.data.plainLyrics && response.data.plainLyrics.trim().length > 30);
+      const hasActualLyrics = !!(response.data.plainLyrics && response.data.plainLyrics.trim().length > 20);
 
       const result = {
         found: true,
@@ -178,7 +138,7 @@ export async function checkLrclib(trackName, artistName, albumName, durationMs) 
         const topMatch = searchRes.data[0];
         const isInst = topMatch.instrumental === true ||
           (!topMatch.plainLyrics && !topMatch.syncedLyrics);
-        const hasActualLyrics = !!(topMatch.plainLyrics && topMatch.plainLyrics.trim().length > 30);
+        const hasActualLyrics = !!(topMatch.plainLyrics && topMatch.plainLyrics.trim().length > 20);
 
         const result = {
           found: true,
@@ -189,14 +149,12 @@ export async function checkLrclib(trackName, artistName, albumName, durationMs) 
         lyricsCache.set(cacheKey, result);
         return result;
       }
-    } catch (searchErr) {
-      // Ignore
-    }
+    } catch (searchErr) {}
   }
 
   const notFound = {
     found: false,
-    isInstrumental: null,
+    isInstrumental: false,
     hasLyrics: false,
     noLyricsFoundInDatabase: true
   };
@@ -206,126 +164,93 @@ export async function checkLrclib(trackName, artistName, albumName, durationMs) 
 
 export async function analyzeTrackInstrumental(track, audioFeatures = null, options = {}) {
   const threshold = options.threshold !== undefined ? options.threshold : 0.5;
-  const trustSourcePlaylist = options.trustSourcePlaylist === true;
-  const source = options.source || '';
+  const name = (track.name || '').toLowerCase();
+  const album = (track.album?.name || '').toLowerCase();
+  const artists = (track.artists || []).map(a => (a.name || '').toLowerCase()).join(', ');
 
-  if (trustSourcePlaylist && source === 'Playlist') {
+  if (/\(feat\.|\bft\.|\bvocals?\b|\bacapella\b/i.test(name)) {
     return {
       id: track.id,
       uri: track.uri,
       name: track.name,
       artists: (track.artists || []).map(a => a.name).join(', '),
       album: track.album?.name,
-      albumArt: track.album?.images?.[0]?.url || track.album?.images?.[1]?.url || '',
+      albumArt: track.album?.images?.[0]?.url || '',
       duration_ms: track.duration_ms,
       preview_url: track.preview_url,
       external_url: track.external_urls?.spotify,
-      spotifyScore: null,
-      confidenceScore: 100,
-      isInstrumental: true,
-      statusLabel: 'Source Playlist Track',
-      reasons: ['From your selected instrumental playlist']
+      confidenceScore: 0,
+      isInstrumental: false,
+      statusLabel: 'Vocal Track',
+      reasons: ['Contains featured vocalist / vocal marker']
     };
   }
-
-  const name = track.name || '';
-  const lowerName = name.toLowerCase();
-  const artists = (track.artists || []).map(a => a.name).join(', ');
-  const lowerArtists = artists.toLowerCase();
-  const albumName = track.album?.name || '';
-  const lowerAlbum = albumName.toLowerCase();
 
   let confidence = 0;
   let reasons = [];
   let isInstrumental = false;
 
-  let spotifyScore = null;
-  if (audioFeatures && typeof audioFeatures.instrumentalness === 'number') {
-    spotifyScore = audioFeatures.instrumentalness;
-    if (spotifyScore >= threshold) {
-      confidence = Math.max(confidence, Math.round(spotifyScore * 100));
+  for (const kw of STRICT_TITLE_KEYWORDS) {
+    if (name.includes(kw)) {
+      confidence = 95;
       isInstrumental = true;
-      reasons.push(`Spotify Audio Feature: ${Math.round(spotifyScore * 100)}%`);
-    } else if (spotifyScore < 0.15) {
-      confidence = Math.min(confidence, 15);
-      reasons.push(`Spotify Audio Feature: low instrumentalness (${Math.round(spotifyScore * 100)}%)`);
-    }
-  }
-
-  for (const kw of INSTRUMENTAL_TITLE_KEYWORDS) {
-    if (lowerName.includes(kw)) {
-      confidence = Math.max(confidence, 95);
-      isInstrumental = true;
-      reasons.push(`Title cue: "${kw}"`);
+      reasons.push(`Title explicitly contains "${kw}"`);
       break;
     }
   }
 
-  for (const ostKw of SOUNDTRACK_OR_OST_KEYWORDS) {
-    if (lowerAlbum.includes(ostKw) || lowerName.includes(ostKw)) {
-      confidence = Math.max(confidence, 90);
-      isInstrumental = true;
-      reasons.push(`Soundtrack/OST album cue: "${ostKw}"`);
-      break;
+  if (!isInstrumental) {
+    for (const artist of PURE_INSTRUMENTAL_ARTISTS) {
+      if (artists.includes(artist)) {
+        confidence = 90;
+        isInstrumental = true;
+        reasons.push(`Pure instrumental artist/composer: "${artist}"`);
+        break;
+      }
     }
   }
 
-  for (const artistCue of INSTRUMENTAL_ARTIST_CUES) {
-    if (lowerArtists.includes(artistCue)) {
-      confidence = Math.max(confidence, 90);
-      isInstrumental = true;
-      reasons.push(`Instrumental artist/composer: "${artistCue}"`);
-      break;
+  if (!isInstrumental) {
+    for (const ost of STRICT_SCORE_OR_SOUNDTRACK) {
+      if (album.includes(ost) || name.includes(ost)) {
+        confidence = 90;
+        isInstrumental = true;
+        reasons.push(`Soundtrack/Score marker: "${ost}"`);
+        break;
+      }
     }
   }
 
-  const gameMatch = lowerName.match(/\((?:from|theme from)\s*["'«]?([^)"'»]+)["'»]?\)/i);
-  if (gameMatch) {
-    confidence = Math.max(confidence, 88);
+  if (!isInstrumental && /\(from\s*["'«]?[^)"'»]+["'»]?\)/i.test(name)) {
+    confidence = 88;
     isInstrumental = true;
-    reasons.push(`Game / Movie theme marker: "${gameMatch[0]}"`);
+    reasons.push('Game theme in title');
   }
 
   if (options.checkLyrics !== false) {
     try {
       const primaryArtist = track.artists?.[0]?.name || artists;
-      const lrclibRes = await checkLrclib(name, primaryArtist, albumName, track.duration_ms);
+      const lrclibRes = await checkLrclib(track.name, primaryArtist, track.album?.name, track.duration_ms);
 
-      if (lrclibRes.found) {
-        if (lrclibRes.isInstrumental) {
-          confidence = Math.max(confidence, 95);
-          isInstrumental = true;
-          reasons.push('Verified instrumental in lyrics registry (0 vocals)');
-        } else if (lrclibRes.hasLyrics) {
-          if (confidence < 90) {
-            isInstrumental = false;
-            confidence = Math.min(confidence, 15);
-            reasons.push('Vocals detected: Song lyrics found in database');
-          }
-        }
-      } else if (lrclibRes.noLyricsFoundInDatabase) {
-        if (isInstrumental || confidence >= 50) {
-          confidence = Math.max(confidence, 92);
-          reasons.push('No lyrics in database (Consistent with instrumental track)');
-        } else {
-          confidence = Math.max(confidence, 65);
-          isInstrumental = true;
-          reasons.push('No vocal lyrics found in database');
-        }
+      if (lrclibRes.hasLyrics) {
+        confidence = 0;
+        isInstrumental = false;
+        reasons = ['Vocal lyrics found in registry'];
+      } else if (lrclibRes.found && lrclibRes.isInstrumental) {
+        confidence = Math.max(confidence, 95);
+        isInstrumental = true;
+        reasons.push('Verified instrumental in lyrics registry (instrumental: true)');
       }
-    } catch (e) {
-      // Ignore
-    }
+    } catch (e) {}
   }
 
   if (confidence >= Math.round(threshold * 100)) {
     isInstrumental = true;
+  } else {
+    isInstrumental = false;
   }
 
-  let statusLabel = 'Vocal Track';
-  if (confidence >= 80) statusLabel = 'Confirmed Instrumental';
-  else if (confidence >= 50) statusLabel = 'Likely Instrumental';
-  else if (confidence >= 30) statusLabel = 'Ambiguous / Needs Review';
+  let statusLabel = isInstrumental ? 'Confirmed Instrumental' : 'Vocal / Non-Instrumental';
 
   return {
     id: track.id,
@@ -333,11 +258,10 @@ export async function analyzeTrackInstrumental(track, audioFeatures = null, opti
     name: track.name,
     artists: (track.artists || []).map(a => a.name).join(', '),
     album: track.album?.name,
-    albumArt: track.album?.images?.[0]?.url || track.album?.images?.[1]?.url || '',
+    albumArt: track.album?.images?.[0]?.url || '',
     duration_ms: track.duration_ms,
     preview_url: track.preview_url,
     external_url: track.external_urls?.spotify,
-    spotifyScore: spotifyScore,
     confidenceScore: confidence,
     isInstrumental,
     statusLabel,

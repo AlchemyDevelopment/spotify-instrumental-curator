@@ -199,9 +199,9 @@ export async function analyzeTrackInstrumental(track, audioFeatures = null, opti
   const album = (track.album?.name || '').toLowerCase();
   const artists = (track.artists || []).map(a => (a.name || '').toLowerCase()).join(', ');
 
-  // Designated 100% instrumental playlists: Pokémon Jazz, Developer Focus, Coding - Epic Instrumentals, The Fall of 26
+  // Designated 100% instrumental playlists: Pokémon Jazz, Developer Focus, Coding - Epic Instrumentals, The Fall of 26, Jazz Vibes, Chosic / clench my fists, Answer Me
   const sourceName = (options.source || options.sourcePlaylist || (options.playlists || []).join(' ')).toLowerCase();
-  const isDesignatedInstrumental = /pok[eé]mon\s*jazz|developer\s*focus|coding\s*-\s*epic\s*instrumentals|the\s*fall\s*of\s*26/i.test(sourceName);
+  const isDesignatedInstrumental = /pok[eé]mon\s*jazz|developer\s*focus|coding\s*-\s*epic\s*instrumentals|the\s*fall\s*of\s*26|jazz\s*vibes|clench\s*my\s*fists|chosic|answer\s*me/i.test(sourceName);
 
   if (isDesignatedInstrumental) {
     return {

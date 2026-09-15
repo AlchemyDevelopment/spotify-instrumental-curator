@@ -9,7 +9,7 @@ export async function isBalancedInstrumental(track, playlists = []) {
   const playlistStr = playlists.join(' ').toLowerCase();
 
   // 0. EXPLICITLY DESIGNATED 100% INSTRUMENTAL PLAYLISTS (User Rule)
-  if (/pok[eé]mon\s*jazz|developer\s*focus|coding\s*-\s*epic\s*instrumentals|the\s*fall\s*of\s*26/i.test(playlistStr)) {
+  if (/pok[eé]mon\s*jazz|developer\s*focus|coding\s*-\s*epic\s*instrumentals|the\s*fall\s*of\s*26|jazz\s*vibes|clench\s*my\s*fists|chosic|answer\s*me/i.test(playlistStr)) {
     return { isInst: true, reason: 'From designated 100% instrumental playlist' };
   }
 
